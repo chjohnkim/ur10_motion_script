@@ -1,0 +1,4 @@
+<launch>
+ <node pkg="tf" type="static_transform_publisher" name="world2reference" 
+    args="0.7 0.0 0.4 0 0 0 1 world reference 100" />
+</launch>
