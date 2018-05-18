@@ -36,16 +36,26 @@ until finished
 
 End with an example of getting some data out of the system or using it for a little demo
 
-## Running the tests
+## How to run it
 
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-
-Explain what these tests test and why
-
+1. Run a gazebo simulation by launching the following commands in three different terminals
 ```
-Give an example
+roscore
+```
+```
+roslaunch ur_gazebo ur10.launch
+```
+```
+roslaunch ur10_moveit_config ur10_moveit_planning_execution.launch sim:=true
+```
+2. Rviz can also be executed with the following command on a fourth terminal
+```
+roslaunch ur10_moveit_config moveit_rviz.launch config:=true
+```
+
+3. Run the executable python motion plan to run simulation in gazebo environment:
+```
+rosrun ur10_motion_script ur10_turnArcFunction.py
 ```
 
 ### Functions
