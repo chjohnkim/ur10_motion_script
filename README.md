@@ -64,7 +64,7 @@ rosrun ur10_motion_script ur10_turnArcFunction.py
 Purpose: Turns about a reference center point in path mode or tilt mode 
 Parameters: 
 - axis: ['x'/'y'/'z'] - reference axis to turn the position of the end effector about
-- CenterOfCircle_1,2: [int] - coordinate of the reference center of circle to turn the end effector about
+- CenterOfCircle_1,2: [float] - coordinate of the reference center of circle to turn the end effector about
 - angle_degree: [degrees] - angular distance to turn
 - direction: [1/-1] - 1 to turn ccw, -1 to turn cw
 - tilt: ['yes'/'no'] - tilt mode yes or no
