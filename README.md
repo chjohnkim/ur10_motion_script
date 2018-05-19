@@ -1,4 +1,4 @@
-# ur10_motion_planning
+# ur10_motion_script
 
 This is a ROS package to simulate UR10 on gazebo and control the simulation via Moveit! with rviz or a python script.
 
@@ -7,34 +7,33 @@ This is a ROS package to simulate UR10 on gazebo and control the simulation via 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
 ### Hardware Prerequisites
+Hong the UR10
+Computer
+-Configure your computer network for a static IP address
+```
+1. Go to network > Edit connections > Add Ehternet Connection
+2. IPv4 Settings: (Method = Manual, Address = 192.168.1.111, Netmask = 24, Gateway = 192.168.1.1
+3. Save
+```
 
-ur10
 
 ### Software Prerequisites
-- ROS kinetic. 
-- Universal robot package (communication with UR10 controllers).
+- ROS kinetic 
+- Universal robot package (communication with UR10 controllers)
 - Moveit! 
 - Gazebo
 - Rviz
 - Software tested on Ubuntu 16.04.3 LTS.
 
 ### Installing
-
-A step by step series of examples that tell you have to get a development env running
-
-Say what the step will be
-
+#### ur_modern_driver setup
+1. Open terminal and go to your ~/catkin workspace/src directory
+2. git clone modern driver
 ```
-Give the example
+git clone <clone url>
 ```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
+3. Build catkin workspace
+4. If there is error in building, try replacing <ur_hardware_interface.cpp> file in the src directory of ur_modern_driver package (~/catkin_ws/src/ur_modern_driver/src)
 
 ## How to run it
 
