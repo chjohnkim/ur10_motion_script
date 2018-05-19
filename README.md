@@ -89,14 +89,7 @@ rosrun ur10_motion_script ur10_turnArcFunction.py
 
 ## Authors
 
-* **John Kim** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+* **John Kim** 
 
 ## Acknowledgments
 
-* Hat tip to anyone who's code was used
-* Inspiration
-* etc
