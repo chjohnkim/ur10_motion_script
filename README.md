@@ -63,8 +63,9 @@ rosrun ur10_motion_script ur10_turnArcFunction.py
 ### Functions
 
 #### 1. TurnArcAboutAxis(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree, direction, tilt, tilt_axis, tilt_direction)
-Purpose: Turns about a reference center point in path mode or tilt mode 
-Parameters: 
+**Purpose:** Turns about a reference center point in path mode or tilt mode 
+
+**Parameters:** 
 - axis: ['x'/'y'/'z'] - reference axis to turn the position of the end effector about
 - CenterOfCircle_1,2: [float] - coordinate of the reference center of circle to turn the end effector about
 - angle_degree: [degrees] - angular distance to turn
@@ -74,13 +75,15 @@ Parameters:
 - tilt_direction: [1/-1] - 1 to turn ccw, -1 to turn cw 
 
 #### 2. assign_joint_value(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
-Purpose: Manipulate robot arm by specifying joint values
-Parameters: 
+**Purpose:** Manipulate robot arm by specifying joint values
+
+**Parameters:** 
 - joint angles in radians; joint order from base to wrist 
 
 #### 3. assign_pose_target(orient_x, orient_y, orient_z, orient_w, pos_x, pos_y, pos_z)
-Purpose: Manipulate robot arm by specifying end-effector frame pose
-Parameters: 
+**Purpose:** Manipulate robot arm by specifying end-effector frame pose
+
+**Parameters:** 
 - Orientation in quaternions with respect to end-effector frame
 - Cartesian coordinates of end-effector with respect to world frame
 
