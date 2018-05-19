@@ -8,7 +8,9 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Hardware Prerequisites
 Hong the UR10
+
 Computer
+
 -Configure your computer network for a static IP address
 ```
 1. Go to network > Edit connections > Add Ehternet Connection
@@ -26,7 +28,7 @@ Computer
 - Software tested on Ubuntu 16.04.3 LTS.
 
 ### Installing
-#### ur_modern_driver setup
+#### ur_modern_driver
 1. Open terminal and go to your ~/catkin workspace/src directory
 2. git clone modern driver
 ```
