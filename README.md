@@ -23,7 +23,7 @@ These instructions will get you a copy of the project up and running on your loc
 - ROS kinetic 
 - universal_robot package [link](http://wiki.ros.org/universal_robot)
 - ur_modern_driver [link](https://github.com/ThomasTimm/ur_modern_driver)
-- Moveit! 
+- MoveIt! [link](http://docs.ros.org/kinetic/api/moveit_tutorials/html/index.html) 
 - Gazebo
 - Rviz
 - Software tested on Ubuntu 16.04.3 LTS.
