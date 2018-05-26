@@ -77,18 +77,45 @@ roslaunch ur10_motion_script simulation.launch
 - tilt_axis: ['x'/'y'/'z'] - tilting axis with respect to the end effector frame
 - tilt_direction: [1/-1] - 1 to turn ccw, -1 to turn cw 
 
-#### 2. assign_joint_value(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
+#### 2. regrasp(theta, length, phi_target, axis, direction, tilt_axis, tilt_direction)
+**Purpose:** Regrasp thin object by simultaneously tiliting end-effector and widening grip (unit: mm)
+
+**Parameters:** 
+- theta: [degrees] - angle of gripper axis w.r.t. ground surface
+- length: [mm] - length of thin object being gripped by gripper 
+- phi_target: [degrees] - regrasp angle
+- axis: ['x'/'y'/'z'] - reference axis to turn the position of the end effector about
+- direction: [1/-1] - 1 to turn ccw, -1 to turn cw
+- tilt_axis: ['x'/'y'/'z'] - tilting axis with respect to the end effector frame
+- tilt_direction: [1/-1] - 1 to turn ccw, -1 to turn cw 
+
+#### 3. assign_joint_value(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
 **Purpose:** Manipulate robot arm by specifying joint values
 
 **Parameters:** 
 - joint angles in radians; joint order from base to wrist 
 
-#### 3. assign_pose_target(orient_x, orient_y, orient_z, orient_w, pos_x, pos_y, pos_z)
+#### 4. assign_pose_target(pos_x, pos_y, pos_z, orient_x, orient_y, orient_z, orient_w)
 **Purpose:** Manipulate robot arm by specifying end-effector frame pose
 
 **Parameters:** 
 - Orientation in quaternions with respect to end-effector frame
 - Cartesian coordinates of end-effector with respect to world frame
+- Giving 'nil' as the parameter value will leave the parameter unchagned
+
+#### 5. relative_joint_value(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
+**Purpose:** Manipulate by assigning relative joint values w.r.t. current joint values of robot
+
+**Parameters:** 
+- joint angles in radians; joint order from base to wrist 
+
+#### 6. relative_pose_target(axis_world, distance)
+**Purpose:** Manipulate by moving gripper linearly with respect to world frame
+
+**Parameters:** 
+- axis_world: ['x'/'y'/'z'] - reference axis to move linearly about with respect to world frame 
+- distance: [float] - distance to move 
+
 
 ## Authors
 
