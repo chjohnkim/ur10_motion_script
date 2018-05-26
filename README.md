@@ -54,10 +54,13 @@ roslaunch ur10_moveit_config ur10_moveit_planning_execution.launch sim:=true
 ```
 roslaunch ur10_moveit_config moveit_rviz.launch config:=true
 ```
-
 3. Run the executable python motion plan to run simulation in gazebo environment:
 ```
 rosrun ur10_motion_script ur10_turnArcFunction.py
+```
+OR just launch a launch file
+```
+roslaunch ur10_motion_script simulation.launch
 ```
 
 ### Functions
