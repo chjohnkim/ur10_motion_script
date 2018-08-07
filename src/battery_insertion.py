@@ -20,7 +20,7 @@ from dynamixel_msgs.msg import JointState
 from dynamixel_controllers.srv import *
 
 ##___GLOBAL VARIABLES___###
-velocity = 0.05 #velocity scaling factor (0, 1.0] - Safe value for a real robot is ~0.05
+velocity = 0.03 #velocity scaling factor (0, 1.0] - Safe value for a real robot is ~0.05
 #Dynamixel
 goal_pos = float;
 goal_speed = 1.0;
@@ -675,7 +675,7 @@ def regrasp8(theta, length, psi_target, object_width, axis, direction, tilt_axis
              
         
         #Store Values
-        pose_target.position.x = x #- (object_width/2)*psi_current/psi_target #<-------------------------------------------------------------------------------TESTING
+        pose_target.position.x = x #+0.001*psi_current/psi_target #<-------------------------------------------------------------------------------TESTING
         pose_target.position.z = z
         pose_target.orientation.x = quaternion_target[0]
         pose_target.orientation.y = quaternion_target[1]
@@ -711,6 +711,12 @@ def regrasp8(theta, length, psi_target, object_width, axis, direction, tilt_axis
         opposite = a - d
         width = b + c
         position = int((width - 147.41)/(-0.6783))
+        if position > 187:
+            position = position - 2   
+        elif position < 187 and position >184:
+            position = position + 2
+        elif position < 184:
+            position = position
         gposition(pub, command, position) #increment gripper width
         
         print opposite
@@ -1234,6 +1240,81 @@ def TurnArcAboutAxis_2(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree, d
     plan_execute_waypoints(waypoints) 
 
 
+
+def TurnArcAboutAxis_3(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree, direction, tilt, tilt_axis, tilt_direction):
+    rospy.sleep(0.5)
+    pose_target = group.get_current_pose().pose #create a pose variable. The parameters can be seen from "$ rosmsg show Pose"
+    waypoints = []
+    waypoints.append(pose_target)
+    resolution = 2880 #Calculation of resolution by (180/resolution) degrees 
+    #quaternion = [0.5, 0.5, -0.5, 0.5]
+    quaternion = [pose_target.orientation.x, pose_target.orientation.y, pose_target.orientation.z, pose_target.orientation.w]
+    #define the axis of rotation
+    if axis is 'x' :
+        position_1 = pose_target.position.y
+        position_2 = pose_target.position.z
+    if axis is 'y' :
+        position_1 = pose_target.position.z
+        position_2 = pose_target.position.x
+    if axis is 'z' :
+        position_1 = pose_target.position.x
+        position_2 = pose_target.position.y
+
+    circle_radius = ((position_1 - CenterOfCircle_1)**2 + (position_2 - CenterOfCircle_2)**2)**0.5 #Pyth. Theorem to find radius
+    
+    #calculate the global angle with respect to 0 degrees based on which quadrant the end_effector is in 
+    if position_1 > CenterOfCircle_1 and position_2 > CenterOfCircle_2:
+        absolute_angle = math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 < CenterOfCircle_1 and position_2 > CenterOfCircle_2:
+        absolute_angle = math.pi - math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 < CenterOfCircle_1 and position_2 < CenterOfCircle_2:
+        absolute_angle = math.pi + math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 > CenterOfCircle_1 and position_2 < CenterOfCircle_2:
+        absolute_angle = 2.0*math.pi - math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    
+    #print pose_target.orientation
+    theta = 0 # counter that increases the angle  
+    flag = 1   
+    while theta < angle_degree/180.0 * math.pi:
+        if axis is 'x' :
+            pose_target.position.y = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1 #equation of circle from polar to cartesian x = r*cos(theta)+dx
+            pose_target.position.z = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2 #equation of cirlce from polar to cartesian y = r*sin(theta)+dy 
+        if axis is 'y' :
+            pose_target.position.z = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1
+            pose_target.position.x = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2-0.003*theta/(angle_degree*math.pi/180.0)############$$$$$!!!!!!!!!!!######
+        if axis is 'z' :
+            pose_target.position.x = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1
+            pose_target.position.y = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2
+        
+        while flag is 1:     
+            euler = tf.transformations.euler_from_quaternion(quaternion) # convert quaternion to euler
+            
+            roll = euler[0]
+            pitch = euler[1]
+            yaw = euler [2] 
+            flag = 2
+        
+        # increment the orientation angle
+        if tilt_axis is 'x' :
+            roll += tilt_direction*math.pi/resolution
+        if tilt_axis is 'y' :
+            pitch += tilt_direction*math.pi/resolution
+        if tilt_axis is 'z' :
+            yaw += tilt_direction*math.pi/resolution
+        quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw) # convert euler to quaternion
+       
+        # store values to pose_target
+        pose_target.orientation.x = quaternion[0]
+        pose_target.orientation.y = quaternion[1]
+        pose_target.orientation.z = quaternion[2]
+        pose_target.orientation.w = quaternion[3]
+
+        waypoints.append(copy.deepcopy(pose_target))
+        theta+=math.pi/resolution # increment counter, defines the number of waypoints 
+    del waypoints[:2]
+    plan_execute_waypoints(waypoints) 
+
+
 def TurnArc_Battery2(offset, axis, angle_degree, direction, tilt_axis, tilt_direction):
     #offset = 0.28 # Offset of the reference turning point with respect x-axis downards from the ee_link origin 
     pose = group.get_current_pose()
@@ -1453,7 +1534,39 @@ def linear_path(axis_world, distance, vel):
     del waypoints[:1]
     plan_execute_waypoints(waypoints)
 
-
+def linear_path_battery(axis_world, distance, vel):
+    resolution = 0.05 #resolution is interpreted as 1/resolution = number of interpolated points in the path
+    pose_target = group.get_current_pose().pose
+    x_1 = pose_target.position.x
+    y_1 = pose_target.position.y
+    z_1 = pose_target.position.z
+    if axis_world is 'x':
+        x_2 = x_1 + distance
+        y_2 = y_1
+        z_2 = z_1
+    if axis_world is 'y':
+        x_2 = x_1
+        y_2 = y_1 + distance
+        z_2 = z_1
+    if axis_world is 'z':
+        x_2 = x_1
+        y_2 = y_1
+        z_2 = z_1 + distance
+    direction_vector = [x_2-x_1, y_2-y_1, z_2-z_1]
+    pose_target = group.get_current_pose().pose #create a pose variable. The parameters can be seen from "$ rosmsg show Pose"
+    waypoints = []
+    waypoints.append(pose_target)
+    t = 0 # counter/increasing variabe for the parametric equation of straight line      
+    while t <= 1.01:
+        pose_target.position.x = x_1 + direction_vector[0]*t
+        pose_target.position.y = y_1 + direction_vector[1]*t
+        pose_target.position.z = z_1 + direction_vector[2]*t
+        t += resolution 
+        
+        waypoints.append(copy.deepcopy(pose_target))
+         
+    del waypoints[:1]
+    plan_execute_waypoints_linearpath(waypoints, vel)
 
 ###___LINEAR PATH PLAN FROM TWO POINTS___###
 ##This function takes two points in 3D coordinate wrt world frame and plans a linear path for the end_effector to move to
@@ -1587,6 +1700,11 @@ def relative_pose_target(axis_world, distance):
 def plan_execute_waypoints(waypoints):
     (plan3, fraction) = group.compute_cartesian_path(waypoints, 0.01, 0) #parameters(waypoints, resolution_1cm, jump_threshold)
     plan= group.retime_trajectory(robot.get_current_state(), plan3, velocity) #parameter that changes velocity
+    group.execute(plan)
+
+def plan_execute_waypoints_linearpath(waypoints, vel):
+    (plan3, fraction) = group.compute_cartesian_path(waypoints, 0.01, 0) #parameters(waypoints, resolution_1cm, jump_threshold)
+    plan= group.retime_trajectory(robot.get_current_state(), plan3, vel) #parameter that changes velocity
     group.execute(plan)
  
 def plan_asyncExecute_waypoints(waypoints):
@@ -1821,27 +1939,35 @@ def manipulator_arm_control():
 #    object_length = 0.385 #object total length in meters
 #    object_width = 0.0115
 #    delta_0 = 0.036 #insertion length in meters
-#    theta_0 = 20 #target theta
+#    theta_0 = 15 #target theta
 #    offset = 0.2765 + object_length - delta_0  
 #    command = gactive(pub)
 #    rospy.sleep(0.5) 
 #    gposition(pub, command, 212)
-#    assign_joint_value(-0.012793842946187794, -2.2937734762774866, -0.33864146867860967, -5.222081844006674, -1.56740647951235, 1.5610438585281372)
+#    assign_joint_value(0.007031369488686323, -2.0823186079608362, -0.5975297133075159, -2.03791314760317, 1.5771139860153198, -1.5583942572223108)
+
 ##    
 ########___GO TO CONTIAINER AND INSERTION ROUTINE___###
 #    rospy.sleep(1)
 #    pivot = TurnArc_Battery(offset, 'y', 90-theta_0, 1, 'y', 1)
-#    linear_path('z', -0.03, 0)
+#    rospy.sleep(1)
+#    linear_path('z', -0.09, 0)
+#    
 
 #    rospy.sleep(1)
-#    [width, opposite] = regrasp7(theta_0, delta_0, 55, object_width, 'y', 1, 'y', 1, command)
+#    [width, opposite] = regrasp7(theta_0, delta_0, 60, object_width, 'y', 1, 'y', 1, command)
 #    rospy.sleep(1)
-#    TurnArcAboutAxis_2('y', pivot[0]-0.03, pivot[1], 18, 1, 'yes', 'y', -1)
-######___ROTATE-TUCK START___###
+#    TurnArcAboutAxis_2('y', pivot[0]-0.09, pivot[1], 12, 1, 'yes', 'y', -1)
+#######___ROTATE-TUCK START___###
 #    rotate_tuck(17, 0)
-######___ROTATE-TUCK END___###
+#######___ROTATE-TUCK END___###
 #    rospy.sleep(0.5)    
-#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)
+#    gposition(pub, command, 145)
+##    rospy.sleep(0.5)  
+##    linear_path('x', 0.1, 0)
+#    rospy.sleep(0.5)  
+#    linear_path('z', 0.1, 0)
+#    assign_joint_value(0.007031369488686323, -2.0823186079608362, -0.5975297133075159, -2.03791314760317, 1.5771139860153198, -1.5583942572223108)
 ################################################################################################
 
 ####___LEGO INSERTION ROUTINE___###
@@ -1858,9 +1984,9 @@ def manipulator_arm_control():
 
 
 
-#####___LEGO INSERTION ROUTINE___###
+######___LEGO INSERTION ROUTINE___###
 #    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597) # WIDE VIEW POSITION
-#    track_apriltag(6, '/tag_6', 0.115, 0.007, 0.36)
+#    track_apriltag(6, '/tag_6', 0.1305, 0.012, 0.36)
 #    rospy.sleep(1)
 #    force_seek2('z', -0.1, 'z', 5, 0.001, 0.01)
 #    pivot = TurnArc_Battery(offset, 'y', 90-theta_0, 1, 'y', 1)
@@ -1869,6 +1995,7 @@ def manipulator_arm_control():
 #    rospy.sleep(1)
 #    TurnArcAboutAxis_Lego('y', pivot[0], pivot[1], 25, 1, 'yes', 'y', -1)
 #    rotate_tuck(30, 0.005)
+#    rospy.sleep(1)
 #    linear_path('x', -0.027, 0)
 #    rospy.sleep(1)
 #    linear_path('z', 0.060, 0)
@@ -1879,33 +2006,47 @@ def manipulator_arm_control():
 ####___BATTERY INSERTION ROUTINE___###
 #################################################################################################
 #####___PICK UP BATTERY ROUTINE (TAG_1~4)___###
-#    object_length = 0.049 #object total length in meters
-#    object_width = 0.0141
-#    delta_0 = 0.025 #insertion length in meters 0.013 0.005 0.03 0.025
-#    theta_0 = 45 #target theta
-#    offset = 0.281 + object_length - delta_0  
-#    command = gactive(pub)
-#    rospy.sleep(0.5)
-#    gposition(pub, command, 220)
-#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597) ## WIDE VIEW POSITION
-#    track_apriltag(3, '/tag_3', 0.008, 0.016, 0.365)
-#    rospy.sleep(1)
-#    force_seek2('z', -0.1, 'z', 5, 0.003, 0.01)
-#    pickup(command, -delta_0+0.008, 0.05) #+0.002 -0.002 +0.009 +0.008
+    object_length = 0.049 #object total length in meters
+    object_width = 0.0141
+    delta_0 = 0.020 #insertion length in meters 0.013 0.005 0.03 0.025
+    theta_0 = 45 #target theta
+    offset = 0.281 + object_length - delta_0  
+    command = gactive(pub)
+    rospy.sleep(0.5)
+    gposition(pub, command, 220)
+    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597) # WIDE VIEW POSITION
+    ###track_apriltag(2, '/tag_2', -0.012, 0.024, 0.375)
+    rospy.sleep(1)
+    assign_joint_value(0.27717, -2.08739, -1.48259, -4.28390, -1.56225, 1.8479) #To use feedforward manner to track position of battery instead of using apriltag
 
+    rospy.sleep(1)
+    force_seek2('z', -0.1, 'z', 5, 0.003, 0.01)
+    pickup(command, -delta_0-0.001, 0.05)
+    rospy.sleep(1)
 #########___BATTERY INSERTION ROUTINE (WITH FEEDBACK)___###
-#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)  #WIDE VIEW POSITION
-#    track_apriltag(7, '/tag_7', -0.019, 0.011, 0.32)
-#    rospy.sleep(1)
-#    force_seek2('z', -0.1, 'z', 3, 0.001, 0.002)
-#    rospy.sleep(1)
-#    pivot = TurnArc_Battery2(offset, 'y', 90 - theta_0, 1, 'y', 1)
-#    rospy.sleep(1)
-#    linear_path('x', -0.007, 0)
-#    rospy.sleep(1)
-#    [width, opposite] = regrasp8(theta_0, delta_0, 55, object_width, 'y', 1, 'y', 1, command)
-#    rospy.sleep(1)
-#    TurnArcAboutAxis_2('y', pivot[0], pivot[1]-0.007, 20, 1, 'yes', 'y', 1)
+    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)  #WIDE VIEW POSITION
+#    ####track_apriltag(7, '/tag_7', -0.038, 0.004, 0.335)
+    rospy.sleep(1)
+    assign_joint_value(0.05773, -2.13600, -1.19885, -4.51999, -1.56744, 1.62851) # To use feedforward manner to track postion of hole instead of using apriltag
+
+    rospy.sleep(1)
+    pivot = TurnArc_Battery2(offset, 'y', 90 - theta_0, 1, 'y', 1)
+    rospy.sleep(0.5)
+    linear_path_battery('z', -0.0255, 0.01)
+    rospy.sleep(0.5)
+    linear_path_battery('x', -0.011, 0.01)
+    rospy.sleep(0.5)
+    [width, opposite] = regrasp8(theta_0, delta_0, 40, object_width, 'y', 1, 'y', 1, command)
+    rospy.sleep(1)
+    TurnArcAboutAxis_3('y', pivot[0]-0.0255, pivot[1]-0.011, 15, 1, 'yes', 'y', -1)
+    rospy.sleep(0.5)
+    linear_path_battery('x', -0.012, 0.01)
+    rospy.sleep(0.5)
+    rotate_tuck(21, 0)
+    rospy.sleep(0.5)
+    linear_path_battery('x', 0.005, 0.01)
+    rospy.sleep(0.5)
+    linear_path_battery('z', 0.1, 0.01)
 
     
 #################################################################################################
@@ -1956,7 +2097,7 @@ def manipulator_arm_control():
 #    rotate_tuck()
  
 
- 
+    
 
     manipulator_status() #debug
     rospy.spin()
