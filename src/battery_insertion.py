@@ -519,6 +519,92 @@ def track_apriltag(tag_id, tag_frame_name, offset_x, offset_y, offset_z):
 ####____RE-GRASP____####
 #############################################################################################################################################################################################################
 
+###___REGRASP VERTICAL (VERTICAL CARD REGRASP)___###
+## This regrasp function is modified such that psi can reach all the way to 90 degrees in one go  
+def regrasp_Vertical(theta, length, psi_target, object_width, axis, direction, tilt_axis, tilt_dierction, command):
+    finger_length = 0.2765  ##<----------------------------------------------------------------------------------------------------------------------AROUND 0.280
+    pose_target = group.get_current_pose().pose
+    pose_position = [pose_target.position.x, pose_target.position.y, pose_target.position.z]
+    pose_orientation = [pose_target.orientation.x, pose_target.orientation.y, pose_target.orientation.z, pose_target.orientation.w]  
+    world2eelink_matrix = tf_listener.fromTranslationRotation(pose_position, pose_orientation) #change base2eelink from transform to matrix
+    PointA_eelink = [finger_length, -object_width/2-object_width/4, 0, 1] ##<----------------------------------------------------------------------------TESTING
+    PointA_world = numpy.matmul(world2eelink_matrix, PointA_eelink) #Caculate coordinate of point A w.r.t. /world
+    
+    rpy_initial = group.get_current_rpy()
+    
+    rpy_initial = [math.degrees(rpy_initial[0]),math.degrees(rpy_initial[1]), math.degrees(rpy_initial[2])]
+    print 'initial Pose: ', pose_target
+    waypoints = []
+    waypoints.append(pose_target)
+    psi_current = 0.0
+    while psi_current < psi_target: 
+        #Calculate width
+        a = length * math.cos(math.radians(psi_current))
+        b = length * math.sin(math.radians(psi_current))
+        c = object_width * math.cos(math.radians(psi_current))
+        d = object_width * math.sin(math.radians(psi_current))
+        opposite = a - d
+        width = b + c
+        
+        #Calculate orientation
+        rpy_target = [rpy_initial[0], rpy_initial[1]+psi_current, rpy_initial[2]]
+        rpy_target = [math.radians(rpy_target[0]), math.radians(rpy_target[1]), math.radians(rpy_target[2])] 
+        quaternion_target = tf.transformations.quaternion_from_euler(rpy_target[0], rpy_target[1], rpy_target[2])
+        #Calculate position 
+        if theta + psi_current <= 90:
+            z = PointA_world[2] - math.fabs(finger_length*math.cos(math.radians(theta + psi_current))) - math.fabs((width/2)*math.sin(math.radians(theta+psi_current)))
+            x = PointA_world[0] + math.fabs(finger_length*math.sin(math.radians(theta + psi_current))) - math.fabs((width/2)*math.cos(math.radians(theta+psi_current)))
+
+#        elif theta + psi_current is 90:
+#            x = PointA_world[0] + (width/2)
+#            z = PointA_world[2] + finger_length
+        elif theta + psi_current > 90:
+            z = PointA_world[2] + math.fabs(finger_length*math.sin(math.radians(theta + psi_current-90))) - math.fabs((width/2)*math.cos(math.radians(theta+psi_current-90)))
+            x = PointA_world[0] + math.fabs(finger_length*math.cos(math.radians(theta + psi_current-90))) + math.fabs((width/2)*math.sin(math.radians(theta+psi_current-90)))
+            
+        #Store Values
+        pose_target.position.x = x - object_width*psi_current/psi_target #<-------------------------------------------------------------------------------TESTING
+        pose_target.position.z = z
+        pose_target.orientation.x = quaternion_target[0]
+        pose_target.orientation.y = quaternion_target[1]
+        pose_target.orientation.z = quaternion_target[2]
+        pose_target.orientation.w = quaternion_target[3]
+        #print psi_current, [pose_target.position.x, pose_target.position.y, pose_target.position.z] 
+        waypoints.append(copy.deepcopy(pose_target))
+        psi_current += 0.5
+    
+    del waypoints[0]
+    quat_initial = [waypoints[0].orientation.x, waypoints[0].orientation.y, waypoints[0].orientation.z, waypoints[0].orientation.w] 
+    euler_initial = tf.transformations.euler_from_quaternion(quat_initial)     
+    y_initial = euler_initial[1]
+    y_initial = math.degrees(y_initial)
+    y_previous = round(y_initial,0)
+    psi_current = 0
+    #del waypoints[:2] 
+    regrasp_asyncExecute_waypoints(waypoints)
+    
+    while psi_target-1  > psi_current: #while psi is less than the desired psi
+        current_pose = group.get_current_pose().pose
+        quat_current = [current_pose.orientation.x, current_pose.orientation.y, current_pose.orientation.z, current_pose.orientation.w]
+        euler_current = tf.transformations.euler_from_quaternion(quat_current)  
+        y_current = euler_current[1]
+        y_current = round(math.degrees(y_current), 0)
+        if (y_current == y_previous - 1) or (y_current == y_previous + 1):           
+            psi_current = psi_current + 1
+            y_previous = y_current
+        a = length*1000 * math.cos(math.radians(psi_current))
+        b = length*1000 * math.sin(math.radians(psi_current))
+        c = object_width*1000 * math.cos(math.radians(psi_current))
+        d = object_width*1000 * math.sin(math.radians(psi_current))
+        opposite = a - d
+        width = b + c
+        position = int((width - 147.41)/(-0.6783))+3
+        gposition(pub, command, position) #increment gripper width
+        
+        print opposite
+    return [width/1000, opposite/1000]
+
+
 ###___REGRASP FUNCTION 9 (FINGER INTEGRATION FOR BATTERY)___###  
 def regrasp9(theta, length, psi_target, object_width, axis, direction, tilt_axis, tilt_dierction, command):
     finger_length = 0.2765  ##<----------------------------------------------------------------------------------------------------------------------AROUND 0.280
@@ -714,7 +800,7 @@ def regrasp8(theta, length, psi_target, object_width, axis, direction, tilt_axis
         if position > 187:
             position = position - 2   
         elif position < 187 and position >184:
-            position = position + 2
+            position = position + 1
         elif position < 184:
             position = position
         gposition(pub, command, position) #increment gripper width
@@ -1314,6 +1400,91 @@ def TurnArcAboutAxis_3(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree, d
     del waypoints[:2]
     plan_execute_waypoints(waypoints) 
 
+def TurnArc_Vertical(offset, axis, angle_degree, direction, tilt_axis, tilt_direction):
+    #offset = 0.28 # Offset of the reference turning point with respect x-axis downards from the ee_link origin 
+    pose = group.get_current_pose()
+    CenterOfCircle_1 = pose.pose.position.z
+    print CenterOfCircle_1
+    CenterOfCircle_2 = pose.pose.position.x-offset
+    print CenterOfCircle_2
+    TurnArcAboutAxis_Vertical(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree-1, direction, 'yes', tilt_axis, tilt_direction)
+    return [CenterOfCircle_1, CenterOfCircle_2]
+
+
+def TurnArcAboutAxis_Vertical(axis, CenterOfCircle_1, CenterOfCircle_2, angle_degree, direction, tilt, tilt_axis, tilt_direction):
+    rospy.sleep(0.5)
+    pose_target = group.get_current_pose().pose #create a pose variable. The parameters can be seen from "$ rosmsg show Pose"
+    waypoints = []
+    waypoints.append(pose_target)
+    resolution = 2880 #Calculation of resolution by (180/resolution) degrees 
+    quaternion = [0.0, 0.7071, -0.7071, 0.0]
+  
+    #define the axis of rotation
+    if axis is 'x' :
+        position_1 = pose_target.position.y
+        position_2 = pose_target.position.z
+    if axis is 'y' :
+        position_1 = pose_target.position.z
+        position_2 = pose_target.position.x
+    if axis is 'z' :
+        position_1 = pose_target.position.x
+        position_2 = pose_target.position.y
+
+    circle_radius = ((position_1 - CenterOfCircle_1)**2 + (position_2 - CenterOfCircle_2)**2)**0.5 #Pyth. Theorem to find radius
+    
+    #calculate the global angle with respect to 0 degrees based on which quadrant the end_effector is in 
+    if position_1 > CenterOfCircle_1 and position_2 > CenterOfCircle_2:
+        absolute_angle = math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 < CenterOfCircle_1 and position_2 > CenterOfCircle_2:
+        absolute_angle = math.pi - math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 < CenterOfCircle_1 and position_2 < CenterOfCircle_2:
+        absolute_angle = math.pi + math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    if position_1 > CenterOfCircle_1 and position_2 < CenterOfCircle_2:
+        absolute_angle = 2.0*math.pi - math.asin(math.fabs(position_2 - CenterOfCircle_2) / circle_radius)
+    
+    #print pose_target.orientation
+    theta = 0 # counter that increases the angle  
+    flag = 1   
+    while theta < angle_degree/180.0 * math.pi:
+        if axis is 'x' :
+            pose_target.position.y = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1 #equation of circle from polar to cartesian x = r*cos(theta)+dx
+            pose_target.position.z = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2 #equation of cirlce from polar to cartesian y = r*sin(theta)+dy 
+        if axis is 'y' :
+            pose_target.position.z = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1
+            pose_target.position.x = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2
+        if axis is 'z' :
+            pose_target.position.x = circle_radius * math.cos(theta*direction+absolute_angle)+CenterOfCircle_1
+            pose_target.position.y = circle_radius * math.sin(theta*direction+absolute_angle)+CenterOfCircle_2
+        
+        while flag is 1:     
+            euler = tf.transformations.euler_from_quaternion(quaternion) # convert quaternion to euler
+            
+            roll = euler[0]
+            pitch = euler[1]
+            yaw = euler [2] 
+            flag = 2
+        
+        # increment the orientation angle
+        if tilt_axis is 'x' :
+            roll += tilt_direction*math.pi/resolution
+        if tilt_axis is 'y' :
+            pitch += tilt_direction*math.pi/resolution
+        if tilt_axis is 'z' :
+            yaw += tilt_direction*math.pi/resolution
+        quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw) # convert euler to quaternion
+       
+        # store values to pose_target
+        pose_target.orientation.x = quaternion[0]
+        pose_target.orientation.y = quaternion[1]
+        pose_target.orientation.z = quaternion[2]
+        pose_target.orientation.w = quaternion[3]
+
+        waypoints.append(copy.deepcopy(pose_target))
+        theta+=math.pi/resolution # increment counter, defines the number of waypoints 
+    del waypoints[:2]
+    plan_execute_waypoints(waypoints) 
+
+
 
 def TurnArc_Battery2(offset, axis, angle_degree, direction, tilt_axis, tilt_direction):
     #offset = 0.28 # Offset of the reference turning point with respect x-axis downards from the ee_link origin 
@@ -1758,54 +1929,12 @@ def manipulator_arm_control():
 #    relative_joint_value(0, 0, 0, 0, -math.pi/2, 0)
 #    assign_pose_target(-0.52, 0.1166, 0.22434, 0.0, 0.707, -0.707, 0.0) # REAL ROBOT ENVIRONMENT    
 
-
 ###___TURNARC DEMO___### 
 #    assign_pose_target(-0.52, 0.1166, 0.22434, 0.0, 0.707, -0.707, 0.0) ## REAL ROBOT ENVIRONMENT
 #    TurnArcAboutAxis('y', 0.22434, -0.79, 90, -1, 'yes', 'y', 1)
 #    TurnArcAboutAxis('y', 0.22434, -0.79, 45, 1, 'yes', 'y', -1)
 #    TurnArcAboutAxis('y', 0.22434, -0.79, 70, -1, 'yes', 'y', 1)
 #    TurnArcAboutAxis('y', 0.22434, -0.79, 70, 1, 'yes', 'y', -1)
-
-
-###___BATTERY INSERTION DEMO1___###    
-#    command = gactive(pub) 
-#    gposition(pub, command, 200)
-#    assign_pose_target(-0.51686279, 0.134689, 0.1892067, 0.0, -0.7071, 0.7071, 0.0)
-#    relative_pose_target('x', -0.085)
-#    relative_pose_target('z', -0.10)    
-#    TurnArcAboutAxis('y', 0.0888, -0.82, 45, -1, 'yes', 'y', 1)
-#    relative_pose_target('z', -0.02)
-#    regrasp1(45.0, 15, 20, 'y', -1, 'y', 1, command)
-#    relative_pose_target('x', -0.006)
-    
-
-###___BATTERY INSERTION DEMO2___###    
-#    command = gactive(pub) 
-#    gposition(pub, command, 200)
-#    assign_pose_target(-0.51686279, 0.134689, 0.1892067, 0.0, -0.7071, 0.7071, 0.0)
-#    relative_pose_target('x', -0.085)
-#    relative_pose_target('z', -0.10)    
-#    TurnArcAboutAxis('y', 0.0888, -0.82, 45, -1, 'yes', 'y', 1)
-#    relative_pose_target('z', -0.018)
-#    regrasp2(45.0, 15, 20, 14, 'y', -1, 'y', 1, command)
-#    relative_pose_target('x', -0.005)
-#    final_push()
-
-
-##TEMP_START
-#    assign_pose_target(-0.52, 0.1166, 0.22434, 0.0, 0.707, -0.707, 0.0) ## REAL ROBOT ENVIRONMENT
-#    TurnArcAboutAxis('y', 0.22434, -0.79, 90, -1, 'yes', 'y', 1)
-#    object_length = 0.0853 #object total length in meters
-#    object_width = 0.005
-#    delta_0 = 0.040 #insertion length in meters
-#    theta_0 = 45 #target theta
-#    offset = 0.2765 + object_length - delta_0  
-#    command = gactive(pub)
-#    pivot = TurnArc_Battery(offset, 'y', 90-theta_0, 1, 'y', 1)
-#    rospy.sleep(1)
-#    [width, opposite] = regrasp7(theta_0, delta_0, 89, object_width, 'y', 1, 'y', 1, command)
-#    TurnArcAboutAxis('y', pivot[0], pivot[1], theta_0-5, 1, 'yes', 'y', 1)
-##TEMP_END
 
 ###___CARD INSERTION ROUTINE___###
 ##################################################################################################
@@ -2006,50 +2135,103 @@ def manipulator_arm_control():
 ####___BATTERY INSERTION ROUTINE___###
 #################################################################################################
 #####___PICK UP BATTERY ROUTINE (TAG_1~4)___###
-    object_length = 0.049 #object total length in meters
-    object_width = 0.0141
-    delta_0 = 0.020 #insertion length in meters 0.013 0.005 0.03 0.025
-    theta_0 = 45 #target theta
-    offset = 0.281 + object_length - delta_0  
-    command = gactive(pub)
-    rospy.sleep(0.5)
-    gposition(pub, command, 220)
-    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597) # WIDE VIEW POSITION
-    ###track_apriltag(2, '/tag_2', -0.012, 0.024, 0.375)
-    rospy.sleep(1)
-    assign_joint_value(0.27717, -2.08739, -1.48259, -4.28390, -1.56225, 1.8479) #To use feedforward manner to track position of battery instead of using apriltag
+#    object_length = 0.049 #object total length in meters
+#    object_width = 0.0141
+#    delta_0 = 0.020 #insertion length in meters 0.013 0.005 0.03 0.025
+#    theta_0 = 45 #target theta
+#    offset = 0.281 + object_length - delta_0  
+#    command = gactive(pub)
+#    rospy.sleep(0.5)
+#    gposition(pub, command, 220)
+#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597) # WIDE VIEW POSITION
+#    ###track_apriltag(2, '/tag_2', -0.012, 0.024, 0.375)
+#    rospy.sleep(1)
+#    assign_joint_value(0.27717, -2.08739, -1.48259, -4.28390, -1.56225, 1.8479) #To use feedforward manner to track position of battery instead of using apriltag
 
-    rospy.sleep(1)
-    force_seek2('z', -0.1, 'z', 5, 0.003, 0.01)
-    pickup(command, -delta_0-0.001, 0.05)
-    rospy.sleep(1)
-#########___BATTERY INSERTION ROUTINE (WITH FEEDBACK)___###
-    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)  #WIDE VIEW POSITION
-#    ####track_apriltag(7, '/tag_7', -0.038, 0.004, 0.335)
-    rospy.sleep(1)
-    assign_joint_value(0.05773, -2.13600, -1.19885, -4.51999, -1.56744, 1.62851) # To use feedforward manner to track postion of hole instead of using apriltag
+#    rospy.sleep(1)
+#    force_seek2('z', -0.1, 'z', 5, 0.003, 0.01)
+#    pickup(command, -delta_0-0.001, 0.05)
+#    rospy.sleep(1)
+##########___BATTERY INSERTION ROUTINE (WITH FEEDBACK)___###
+#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)  #WIDE VIEW POSITION
+##    ####track_apriltag(7, '/tag_7', -0.038, 0.004, 0.335)
+#    rospy.sleep(1)
+#    assign_joint_value(0.05773, -2.13600, -1.19885, -4.51999, -1.56744, 1.62851) # To use feedforward manner to track postion of hole instead of using apriltag
 
-    rospy.sleep(1)
-    pivot = TurnArc_Battery2(offset, 'y', 90 - theta_0, 1, 'y', 1)
-    rospy.sleep(0.5)
-    linear_path_battery('z', -0.0255, 0.01)
-    rospy.sleep(0.5)
-    linear_path_battery('x', -0.011, 0.01)
-    rospy.sleep(0.5)
-    [width, opposite] = regrasp8(theta_0, delta_0, 40, object_width, 'y', 1, 'y', 1, command)
-    rospy.sleep(1)
-    TurnArcAboutAxis_3('y', pivot[0]-0.0255, pivot[1]-0.011, 15, 1, 'yes', 'y', -1)
-    rospy.sleep(0.5)
-    linear_path_battery('x', -0.012, 0.01)
-    rospy.sleep(0.5)
-    rotate_tuck(21, 0)
-    rospy.sleep(0.5)
-    linear_path_battery('x', 0.005, 0.01)
-    rospy.sleep(0.5)
-    linear_path_battery('z', 0.1, 0.01)
+#    rospy.sleep(1)
+#    pivot = TurnArc_Battery2(offset, 'y', 90 - theta_0, 1, 'y', 1)
+#    rospy.sleep(0.5)
+#    linear_path_battery('z', -0.0255, 0.01)
+#    rospy.sleep(0.5)
+#    linear_path_battery('x', -0.011, 0.01)
+#    rospy.sleep(0.5)
+#    [width, opposite] = regrasp8(theta_0, delta_0, 40, object_width, 'y', 1, 'y', 1, command)
+#    rospy.sleep(1)
+#    TurnArcAboutAxis_3('y', pivot[0]-0.0255, pivot[1]-0.011, 15, 1, 'yes', 'y', -1)
+#    rospy.sleep(0.5)
+#    linear_path_battery('x', -0.012, 0.01)
+#    rospy.sleep(0.5)
+#    rotate_tuck(21, 0)
+#    rospy.sleep(0.5)
+#    linear_path_battery('x', 0.005, 0.01)
+#    rospy.sleep(0.5)
+#    linear_path_battery('z', 0.1, 0.01)
 
     
 #################################################################################################
+
+
+
+###___VERTICALCARD INSERTION ROUTINE___###
+##################################################################################################
+###___PICK UP CARD ROUTINE___###
+    object_length = 0.0853 ##object total length in meters
+    object_width = 0.005
+    delta_0 = 0.010 ##insertion length in meters
+    theta_0 = 45 ##target theta
+    offset = 0.2765 + object_length - delta_0  
+    command = gactive(pub)
+    rospy.sleep(0.5) 
+    gposition(pub, command, 220)
+    assign_joint_value(-0.0095, -1.5868, -1.8021, -4.1399, -1.7143, 1.6343) ##WIDE VIEW POSITION
+    rospy.sleep(1)
+    assign_joint_value(0.2786, -1.8879, -1.6848, -4.2835, -1.5693, 1.8493)
+
+    rospy.sleep(1)
+    #####track_apriltag(6, '/tag_6', -0.041, 0.021, 0.37)
+
+    force_seek2('z', -0.1, 'z', 5, 0.003, 0.01)
+    pickup(command, -delta_0+0.002, 0.05)
+
+##force_seek2(axis_world, distance, force_direction, sensitivity, final_offset, vel):
+#####___GO TO CARD RECEPTACLE AND INSERTION ROUTINE___###
+
+    assign_joint_value(-0.0334, -1.0729, -1.8955, -3.3090, -1.5959, 1.5726) ##VERTICAL POSITION
+    rospy.sleep(0.5)
+    linear_path_battery('x', -0.098, 0.01) 
+    rospy.sleep(1)
+    linear_path_battery('z', 0.011, 0.01) 
+
+    pivot = TurnArc_Vertical(offset, 'y', 90-theta_0, 1, 'y', -1)
+    rospy.sleep(1)
+    [width, opposite] = regrasp_Vertical(theta_0, delta_0, 45, object_width, 'y', 1, 'y', 1, command)
+    rospy.sleep(1)
+    TurnArcAboutAxis_2('y', pivot[0], pivot[1], 34, 1, 'yes', 'y', -1)
+####___ROTATE-TUCK START___###
+    rospy.sleep(1)
+    rotate_tuck(42, 0)
+####___ROTATE-TUCK END___###
+    rospy.sleep(1)
+    linear_path_battery('x', -0.002, 0.01)
+    rospy.sleep(0.5)    
+    linear_path_battery('x', 0.2, 0.01)
+#    assign_joint_value(0.025, -2.114, -1.034, -4.706, -1.569, 1.597)
+##################################################################################################
+
+#    force_seek2('x', -0.1, 'z', 3, 0.001, 0.01)
+#    rospy.sleep(1)
+#    force_seek2('x', -0.1, 'x', 5, 0.001, 0.01)
+#    manipulator_status()
 
 
 
